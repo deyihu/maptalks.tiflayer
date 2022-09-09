@@ -274,19 +274,30 @@ export class TifLayer extends TileLayer {
                 const width = image.getWidth();
                 const height = image.getHeight();
                 let bounds = image.getBoundingBox();
-                const extent = new Extent(bounds);
-                const coordinates = extent.toArray();
+                const geoInfo = image.getGeoKeys();
+                this.geoTifInfo.geoInfo = geoInfo;
+                let extent = new Extent(bounds);
                 let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-                coordinates.forEach(c => {
-                    c = c.toArray();
-                    c = merc.forward(c);
-                    const [x, y] = c;
-                    minx = Math.min(minx, x);
-                    miny = Math.min(miny, y);
-                    maxx = Math.max(maxx, x);
-                    maxy = Math.max(maxy, y);
-                });
-                bounds = [minx, miny, maxx, maxy];
+                const forEachCoordinates = (transform) => {
+                    const coordinates = extent.toArray();
+                    coordinates.forEach(c => {
+                        c = c.toArray();
+                        c = merc[transform](c);
+                        const [x, y] = c;
+                        minx = Math.min(minx, x);
+                        miny = Math.min(miny, y);
+                        maxx = Math.max(maxx, x);
+                        maxy = Math.max(maxy, y);
+                    });
+                };
+                if (geoInfo && geoInfo.GeographicTypeGeoKey === 4326) {
+                    forEachCoordinates('forward');
+                    bounds = [minx, miny, maxx, maxy];
+                }
+                if (geoInfo && geoInfo.ProjectedCSTypeGeoKey === 3857) {
+                    forEachCoordinates('inverse');
+                    extent = new Extent(minx, miny, maxx, maxy);
+                }
                 this.geoTifInfo = Object.assign(this.geoTifInfo, {
                     width, height, bounds, extent
                 });
