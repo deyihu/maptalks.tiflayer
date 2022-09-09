@@ -158,6 +158,27 @@ function getTileImage(options) {
         return imageBitMap;
     }
 }
+const forEachCoordinatesOfExtent = (extent, transform, out) => {
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    const coordinates = extent.toArray();
+    coordinates.forEach(c => {
+        c = c.toArray();
+        c = merc[transform](c);
+        const [x, y] = c;
+        minx = Math.min(minx, x);
+        miny = Math.min(miny, y);
+        maxx = Math.max(maxx, x);
+        maxy = Math.max(maxy, y);
+    });
+    if (out) {
+        out.xmin = minx;
+        out.ymin = miny;
+        out.xmax = maxx;
+        out.ymax = maxy;
+        return out;
+    }
+    return [minx, miny, maxx, maxy];
+};
 
 const options = {
     urlTemplate: './hello?x={x}&y={y}&z={z}',
@@ -228,11 +249,22 @@ export class TifLayer extends TileLayer {
         const y = getParams('y');
         const z = getParams('z');
         const extent = this._getTileExtent(x, y, z);
+        const map = this.getMap();
+        const prj = map.getProjection();
+        let bounds;
+        if (prj.code.indexOf('4326') > -1) {
+            bounds = this.geoTifInfo.bounds;
+        } else if (prj.code.indexOf('3857') > -1) {
+            bounds = this.geoTifInfo.mBounds;
+        }
+        if (!bounds) {
+            console.error('onlay support 4326/3857 prj');
+            return;
+        }
         TEMPBBOX1[0] = extent.xmin;
         TEMPBBOX1[1] = extent.ymin;
         TEMPBBOX1[2] = extent.xmax;
         TEMPBBOX1[3] = extent.ymax;
-        const bounds = this.geoTifInfo.bounds;
         TEMPBBOX2[0] = bounds[0];
         TEMPBBOX2[1] = bounds[1];
         TEMPBBOX2[2] = bounds[2];
@@ -242,7 +274,7 @@ export class TifLayer extends TileLayer {
             loadTile(blank);
             return null;
         }
-        const tileBounds = this.getImageBounds(x, y, z);
+        const tileBounds = this.getImageBounds(x, y, z, bounds);
         const dataUrl = getTileImage({
             bounds: tileBounds,
             image: this.geoTifInfo.canvas,
@@ -274,32 +306,19 @@ export class TifLayer extends TileLayer {
                 const width = image.getWidth();
                 const height = image.getHeight();
                 let bounds = image.getBoundingBox();
+                let mBounds = bounds;
                 const geoInfo = image.getGeoKeys();
                 this.geoTifInfo.geoInfo = geoInfo;
-                let extent = new Extent(bounds);
-                let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-                const forEachCoordinates = (transform) => {
-                    const coordinates = extent.toArray();
-                    coordinates.forEach(c => {
-                        c = c.toArray();
-                        c = merc[transform](c);
-                        const [x, y] = c;
-                        minx = Math.min(minx, x);
-                        miny = Math.min(miny, y);
-                        maxx = Math.max(maxx, x);
-                        maxy = Math.max(maxy, y);
-                    });
-                };
+                const extent = new Extent(bounds);
                 if (geoInfo && geoInfo.GeographicTypeGeoKey === 4326) {
-                    forEachCoordinates('forward');
-                    bounds = [minx, miny, maxx, maxy];
+                    mBounds = forEachCoordinatesOfExtent(extent, 'forward');
                 }
                 if (geoInfo && geoInfo.ProjectedCSTypeGeoKey === 3857) {
-                    forEachCoordinates('inverse');
-                    extent = new Extent(minx, miny, maxx, maxy);
+                    bounds = forEachCoordinatesOfExtent(extent, 'inverse');
+                    forEachCoordinatesOfExtent(extent, 'inverse', extent);
                 }
                 this.geoTifInfo = Object.assign(this.geoTifInfo, {
-                    width, height, bounds, extent
+                    width, height, bounds, extent, mBounds
                 });
                 this.readTif(image);
             });
@@ -359,10 +378,10 @@ export class TifLayer extends TileLayer {
         read();
     }
 
-    getImageBounds(x, y, z) {
+    getImageBounds(x, y, z, bounds) {
         const extent = this._getTileExtent(x, y, z);
         const tileminx = extent.xmin, tileminy = extent.ymin, tilemaxx = extent.xmax, tilemaxy = extent.ymax;
-        const { width, height, bounds } = this.geoTifInfo;
+        const { width, height } = this.geoTifInfo;
         const [minx, miny, maxx, maxy] = bounds;
         const ax = width / (maxx - minx), ay = height / (maxy - miny);
         const px = (tileminx - minx) * ax, py = height - (tilemaxy - miny) * ay;
