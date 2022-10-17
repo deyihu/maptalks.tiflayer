@@ -292,10 +292,10 @@ function createImage(width, height, data) {
         imageData.data[idx] = r;
         imageData.data[idx + 1] = g;
         imageData.data[idx + 2] = b;
-        let alpha = 255;
-        if (r === 0 && g === 0 && b === 0) {
-            alpha = 0;
-        }
+        const alpha = 255;
+        // if (r === 0 && g === 0 && b === 0) {
+        //     alpha = 0;
+        // }
         imageData.data[idx + 3] = alpha;
         idx += 4;
     }
@@ -319,10 +319,10 @@ registerWorkerAdapter(workerKey, function (exports, global) {
             imageData.data[idx] = r;
             imageData.data[idx + 1] = g;
             imageData.data[idx + 2] = b;
-            let alpha = 255;
-            if (r === 0 && g === 0 && b === 0) {
-                alpha = 0;
-            }
+            const alpha = 255;
+            // if (r === 0 && g === 0 && b === 0) {
+            //     alpha = 0;
+            // }
             imageData.data[idx + 3] = alpha;
             idx += 4;
         }
