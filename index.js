@@ -71,7 +71,7 @@ function mergeArrayBuffer(datas) {
     return data;
 }
 
-function createImage(width, height, data) {
+function createImage(width, height, data, ignoreBlackColor) {
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     const imageData = ctx.createImageData(canvas.width, canvas.height);
@@ -81,10 +81,12 @@ function createImage(width, height, data) {
         imageData.data[idx] = r;
         imageData.data[idx + 1] = g;
         imageData.data[idx + 2] = b;
-        const alpha = 255;
-        // if (r === 0 && g === 0 && b === 0) {
-        //     alpha = 0;
-        // }
+        let alpha = 255;
+        if (ignoreBlackColor) {
+            if (r === 0 && g === 0 && b === 0) {
+                alpha = 0;
+            }
+        }
         imageData.data[idx + 3] = alpha;
         idx += 4;
     }
@@ -98,7 +100,7 @@ registerWorkerAdapter(workerKey, function (exports, global) {
         return new OffscreenCanvas(width, height);
     }
 
-    function createImage(width, height, data) {
+    function createImage(width, height, data, ignoreBlackColor) {
         const canvas = createCanvas(width, height);
         const ctx = canvas.getContext('2d');
         const imageData = ctx.createImageData(canvas.width, canvas.height);
@@ -108,10 +110,12 @@ registerWorkerAdapter(workerKey, function (exports, global) {
             imageData.data[idx] = r;
             imageData.data[idx + 1] = g;
             imageData.data[idx + 2] = b;
-            const alpha = 255;
-            // if (r === 0 && g === 0 && b === 0) {
-            //     alpha = 0;
-            // }
+            let alpha = 255;
+            if (ignoreBlackColor) {
+                if (r === 0 && g === 0 && b === 0) {
+                    alpha = 0;
+                }
+            }
             imageData.data[idx + 3] = alpha;
             idx += 4;
         }
@@ -124,9 +128,9 @@ registerWorkerAdapter(workerKey, function (exports, global) {
     exports.onmessage = function (message, postResponse) {
         const data = message.data;
         const { type } = data;
-        const { width, height, buffer } = data;
+        const { width, height, buffer, ignoreBlackColor } = data;
         if (type === 'createimage') {
-            const imageBitmap = createImage(width, height, new Uint8Array(buffer));
+            const imageBitmap = createImage(width, height, new Uint8Array(buffer), ignoreBlackColor);
             postResponse(null, { loaded: true, buffer: imageBitmap }, [imageBitmap]);
         }
     };
@@ -180,10 +184,15 @@ const forEachCoordinatesOfExtent = (extent, transform, out) => {
     return [minx, miny, maxx, maxy];
 };
 
+const is4326 = (code) => {
+    return code === 4326 || code === 4490;
+};
+
 const options = {
     urlTemplate: './hello?x={x}&y={y}&z={z}',
     datadebug: false,
-    quality: 0.6
+    quality: 0.6,
+    ignoreBlackColor: false
 };
 
 export class TifLayer extends TileLayer {
@@ -310,12 +319,17 @@ export class TifLayer extends TileLayer {
                 const geoInfo = image.getGeoKeys();
                 this.geoTifInfo.geoInfo = geoInfo;
                 const extent = new Extent(bounds);
-                if (geoInfo && geoInfo.GeographicTypeGeoKey === 4326) {
-                    mBounds = forEachCoordinatesOfExtent(extent, 'forward');
+                if (!geoInfo) {
+                    console.error('not find tif geo info');
+                    return;
                 }
-                if (geoInfo && geoInfo.ProjectedCSTypeGeoKey === 3857) {
+                if (is4326(geoInfo.GeographicTypeGeoKey)) {
+                    mBounds = forEachCoordinatesOfExtent(extent, 'forward');
+                } else if (geoInfo.ProjectedCSTypeGeoKey === 3857) {
                     bounds = forEachCoordinatesOfExtent(extent, 'inverse');
                     forEachCoordinatesOfExtent(extent, 'inverse', extent);
+                } else {
+                    console.error('Current coordinate projection not supported ', geoInfo);
                 }
                 this.geoTifInfo = Object.assign(this.geoTifInfo, {
                     width, height, bounds, extent, mBounds
@@ -354,14 +368,14 @@ export class TifLayer extends TileLayer {
                 }
                 this.geoTifInfo.data = mergeArrayBuffer(datas);
                 if (!Browser.decodeImageInWorker) {
-                    this.geoTifInfo.canvas = createImage(width, height, this.geoTifInfo.data);
+                    this.geoTifInfo.canvas = createImage(width, height, this.geoTifInfo.data, this.options.ignoreBlackColor);
                     this.geoTifInfo.loaded = true;
                     this.fire('tifload', Object.assign({}, this.geoTifInfo));
                     this._tifLoaded();
                 } else {
                     const actor = getActor();
                     const arrayBuffer = this.geoTifInfo.data.buffer;
-                    actor.send({ width, height, type: 'createimage', url: this.geoTifInfo.url, buffer: arrayBuffer },
+                    actor.send({ width, height, type: 'createimage', url: this.geoTifInfo.url, buffer: arrayBuffer, ignoreBlackColor: this.options.ignoreBlackColor },
                         [arrayBuffer], (err, message) => {
                             if (err) {
                                 console.error(err);
