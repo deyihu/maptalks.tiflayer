@@ -49,7 +49,7 @@
             // tifUrl: './test4.tif',
             // debug: true,
             datadebug: true,
-            // ignoreBlackColor: true
+            ignoreBlackColor: true
         }).addTo(map);
         layer.on('tifload', e => {
             map.fitExtent(e.extent);

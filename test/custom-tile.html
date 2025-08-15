@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tif file layer</title>
+<style type="text/css">
+    html,
+    body {
+        margin: 0px;
+        height: 100%;
+        width: 100%
+    }
+
+    .container {
+        width: 100%;
+        height: 100%
+    }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/maptalks/dist/maptalks.css">
+<script type="text/javascript" src="https://unpkg.com/maptalks/dist/maptalks.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/geotiff/dist-browser/geotiff.js"></script>
+<script type="text/javascript" src="https://unpkg.com/maptalks.tiflayer/dist/maptalks.tiflayer.js"></script>
+<script type='text/javascript' src='https://unpkg.com/maptalks.tileclip@latest/dist/maptalks.tileclip.js'></script>
+
+<body>
+    <!-- <input type="file" accept=".tif" id="file" /> -->
+    <div id="map" class="container"></div>
+
+    <script>
+        // maptalks.Browser.decodeImageInWorker = false;
+        var map = new maptalks.Map('map', {
+            center: [-0.113049, 51.498568],
+            zoom: 11,
+            baseLayer: new maptalks.TileLayer('base', {
+                urlTemplate: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                subdomains: ["a", "b", "c", "d"],
+                attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/">CARTO</a>'
+            })
+        });
+
+        // document.querySelector('#file').addEventListener('change', e => {
+        //     const file = e.target.files[0];
+        //     console.log(file);
+        //     console.log(`文件大小:${Math.round(file.size / 1024 / 1024)}M`);
+        //     const url = URL.createObjectURL(file);
+        //     layer.setTifUrl(url);
+        // })
+
+        const layer = new maptalks.TifLayer('tif', {
+            // tifUrl: './test4.tif',
+            // debug: true,
+            datadebug: true,
+            // ignoreBlackColor: true
+        })
+        layer.on('tifload', e => {
+            map.fitExtent(e.extent);
+        })
+
+        const debugLayer = new maptalks.VectorLayer('layer').addTo(map);
+
+        const tileActor = maptalks.getTileActor();
+        const maskId = '青浦区';
+
+        layer.customTileImage = function (image, tile, callback) {
+            tileActor.clipTile({
+                tile: image,
+                tileBBOX: layer._getTileBBox(tile),
+                projection: layer.getProjection().code,
+                tileSize: layer.getTileSize().width,
+                maskId,
+            }).then(image => {
+                callback(image);
+            }).catch(error => {
+                //do some things
+                console.error(error);
+            })
+        }
+
+        
+        const symbol = {
+            polygonOpacity: 0,
+            lineColor: 'red'
+        }
+        fetch('./mask.geojson').then(res => res.json()).then(geojson => {
+            const polygons = maptalks.GeoJSON.toGeometry(geojson, (geo => {
+                geo.setSymbol(symbol);
+            }));
+            debugLayer.addGeometry(polygons);
+            tileActor.injectMask(maskId, geojson.features[0]).then(data => {
+                layer.addTo(map);
+                layer.setTifUrl('./1.tif');
+            }).catch(error => {
+                console.error(error);
+            })
+        })
+
+
+    </script>
+</body>
+
+</html>
