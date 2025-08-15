@@ -72,16 +72,24 @@ function mergeArrayBuffer(datas) {
 }
 
 function createImage(width, height, data, ignoreBlackColor) {
+    const size = width * height * 4;
+    let pixelSize = 3;
+    if (size === data.length) {
+        pixelSize = 4;
+    }
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     const imageData = ctx.createImageData(canvas.width, canvas.height);
     let idx = 0;
-    for (let i = 0, len = data.length; i < len; i += 3) {
-        const r = data[i], g = data[i + 1], b = data[i + 2];
+    for (let i = 0, len = data.length; i < len; i += pixelSize) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
         imageData.data[idx] = r;
         imageData.data[idx + 1] = g;
         imageData.data[idx + 2] = b;
-        let alpha = 255;
+        let alpha = a;
+        if (pixelSize !== 4) {
+            alpha = 255;
+        }
         if (ignoreBlackColor) {
             if (r === 0 && g === 0 && b === 0) {
                 alpha = 0;
@@ -101,16 +109,25 @@ registerWorkerAdapter(workerKey, function (exports, global) {
     }
 
     function createImage(width, height, data, ignoreBlackColor) {
+
+        const size = width * height * 4;
+        let pixelSize = 3;
+        if (size === data.length) {
+            pixelSize = 4;
+        }
         const canvas = createCanvas(width, height);
         const ctx = canvas.getContext('2d');
         const imageData = ctx.createImageData(canvas.width, canvas.height);
         let idx = 0;
-        for (let i = 0, len = data.length; i < len; i += 3) {
-            const r = data[i], g = data[i + 1], b = data[i + 2];
+        for (let i = 0, len = data.length; i < len; i += pixelSize) {
+            const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
             imageData.data[idx] = r;
             imageData.data[idx + 1] = g;
             imageData.data[idx + 2] = b;
-            let alpha = 255;
+            let alpha = a;
+            if (pixelSize !== 4) {
+                alpha = 255;
+            }
             if (ignoreBlackColor) {
                 if (r === 0 && g === 0 && b === 0) {
                     alpha = 0;
@@ -368,7 +385,12 @@ export class TifLayer extends TileLayer {
                     return;
                 }
                 const top = idx * rowHeight, bottom = Math.min(top + rowHeight, height);
-                image.readRGB({ interleave: true, window: [0, top, width, bottom], pool }).then(data => {
+                image.readRGB({
+                    interleave: true,
+                    window: [0, top, width, bottom],
+                    pool,
+                    enableAlpha: true
+                }).then(data => {
                     datas.push(data);
                     idx++;
                     read();
@@ -378,6 +400,7 @@ export class TifLayer extends TileLayer {
                     return;
                 }
                 this.geoTifInfo.data = mergeArrayBuffer(datas);
+
                 if (!Browser.decodeImageInWorker) {
                     this.geoTifInfo.canvas = createImage(width, height, this.geoTifInfo.data, this.options.ignoreBlackColor);
                     this.geoTifInfo.loaded = true;
