@@ -1,6 +1,6 @@
 {
   "name": "maptalks.tiflayer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "",
   "main": "dist/maptalks.tiflayer.js",
   "module": "./index.js",
