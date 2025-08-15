@@ -4,7 +4,7 @@ The tif file layer for maptalks
 
 **Currently Experimenting**
 
-[demo](https://deyihu.github.io/maptalks.tiflayer/test/index.html)
+[demo](https://deyihu.github.io/maptalks.tiflayer/test/index.html)  
 [custom tile](https://deyihu.github.io/maptalks.tiflayer/test/custom-tile.html)
 
 ## WARNING
