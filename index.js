@@ -247,12 +247,23 @@ export class TifLayer extends TileLayer {
         function getParams(key) {
             return parseInt(searchParams.get(key));
         }
+        const layer = this;
         const loadTile = (dataUrl) => {
-            if (img instanceof Image) {
-                img.src = dataUrl;
+            const reslove = (imageData) => {
+                if (img instanceof Image) {
+                    img.src = imageData;
+                } else {
+                    this.getRenderer().onTileLoad(imageData, tile);
+                }
+            };
+            if (layer.customTileImage && Util.isFunction(layer.customTileImage)) {
+                layer.customTileImage(dataUrl, tile, (bitMap) => {
+                    reslove(bitMap);
+                });
             } else {
-                this.getRenderer().onTileLoad(dataUrl, tile);
+                reslove(dataUrl);
             }
+
         };
         const x = getParams('x');
         const y = getParams('y');
