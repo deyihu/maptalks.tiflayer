@@ -3,6 +3,7 @@ import nodeResolve from 'rollup-plugin-node-resolve';
 import commonjs from 'rollup-plugin-commonjs';
 import json from 'rollup-plugin-json';
 import { terser } from 'rollup-plugin-terser';
+import mtkWorkerPlugin from './worker-plugin';
 import pkg from './package.json';
 const path = require('path');
 
@@ -30,6 +31,19 @@ function getEntry() {
 }
 
 export default [
+    {
+        input: 'src/worker.js',
+        external: external,
+        plugins: product ? plugins.concat([terser(), mtkWorkerPlugin()]) : plugins.concat([mtkWorkerPlugin()]),
+        output: {
+            format: 'amd',
+            name: 'maptalks',
+            globals,
+            extend: true,
+            'banner': banner,
+            file: 'src/worker/worker.bundle.js'
+        }
+    },
     {
         input: getEntry(),
         external: external,

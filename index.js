@@ -1,6 +1,9 @@
 import { TileLayer, Extent, Browser, registerWorkerAdapter, worker, Util } from 'maptalks';
 import { fromArrayBuffer, Pool } from 'geotiff';
 import SphericalMercator from '@mapbox/sphericalmercator';
+import WORKERCODE from './src/worker/worker.bundle.js';
+import { bboxCross, createCanvas, createImage, getBlankImage, mergeArrayBuffer } from './src/util.js';
+
 const merc = new SphericalMercator({
     size: 256,
     antimeridian: true
@@ -8,150 +11,11 @@ const merc = new SphericalMercator({
 const pool = new Pool();
 const TEMPBBOX1 = [1, 1, 1, 1], TEMPBBOX2 = [1, 1, 1, 1];
 const DEFAULT_TILE_SIZE = 256;
-let blankImage, blankCanvas;
 const workerKey = '_tifprocess_';
 let tifActor;
 let tempCanvas;
 
-function createCanvas(width, height) {
-    let canvas;
-    if (Browser.decodeImageInWorker) {
-        canvas = new OffscreenCanvas(width, height);
-    } else {
-        canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-    }
-    return canvas;
-}
-function getBlankImage() {
-    if (!blankCanvas) {
-        blankCanvas = createCanvas(DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE);
-    }
-    if (Browser.decodeImageInWorker) {
-        // eslint-disable-next-line no-unused-vars
-        const ctx = blankCanvas.getContext('2d');
-        return blankCanvas.transferToImageBitmap();
-    } else {
-        if (!blankImage) {
-            blankImage = blankCanvas.toDataURL('image/png', 0.5);
-        }
-        return blankImage;
-    }
-}
-
-function bboxCross(bbox1, bbox2) {
-    if (bbox1[2] < bbox2[0]) {
-        return false;
-    }
-    if (bbox1[1] > bbox2[3]) {
-        return false;
-    }
-    if (bbox1[0] > bbox2[2]) {
-        return false;
-    }
-    if (bbox1[3] < bbox2[1]) {
-        return false;
-    }
-    return true;
-}
-
-function mergeArrayBuffer(datas) {
-    let l = 0;
-    const len = datas.length;
-    for (let i = 0; i < len; i++) {
-        l += datas[i].length;
-    }
-    const data = new Uint8Array(l);
-    let offset = 0;
-    for (let i = 0; i < len; i++) {
-        data.set(datas[i], offset);
-        offset += datas[i].length;
-    }
-    return data;
-}
-
-function createImage(width, height, data, ignoreBlackColor) {
-    const size = width * height * 4;
-    let pixelSize = 3;
-    if (size === data.length) {
-        pixelSize = 4;
-    }
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(canvas.width, canvas.height);
-    let idx = 0;
-    for (let i = 0, len = data.length; i < len; i += pixelSize) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        imageData.data[idx] = r;
-        imageData.data[idx + 1] = g;
-        imageData.data[idx + 2] = b;
-        let alpha = a;
-        if (pixelSize !== 4) {
-            alpha = 255;
-        }
-        if (ignoreBlackColor) {
-            if (r === 0 && g === 0 && b === 0) {
-                alpha = 0;
-            }
-        }
-        imageData.data[idx + 3] = alpha;
-        idx += 4;
-    }
-    ctx.putImageData(imageData, 0, 0);
-    return canvas;
-}
-
-registerWorkerAdapter(workerKey, function (exports, global) {
-
-    function createCanvas(width, height) {
-        return new OffscreenCanvas(width, height);
-    }
-
-    function createImage(width, height, data, ignoreBlackColor) {
-
-        const size = width * height * 4;
-        let pixelSize = 3;
-        if (size === data.length) {
-            pixelSize = 4;
-        }
-        const canvas = createCanvas(width, height);
-        const ctx = canvas.getContext('2d');
-        const imageData = ctx.createImageData(canvas.width, canvas.height);
-        let idx = 0;
-        for (let i = 0, len = data.length; i < len; i += pixelSize) {
-            const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-            imageData.data[idx] = r;
-            imageData.data[idx + 1] = g;
-            imageData.data[idx + 2] = b;
-            let alpha = a;
-            if (pixelSize !== 4) {
-                alpha = 255;
-            }
-            if (ignoreBlackColor) {
-                if (r === 0 && g === 0 && b === 0) {
-                    alpha = 0;
-                }
-            }
-            imageData.data[idx + 3] = alpha;
-            idx += 4;
-        }
-        ctx.putImageData(imageData, 0, 0);
-        return canvas.transferToImageBitmap();
-    }
-
-    exports.initialize = function () {
-    };
-    exports.onmessage = function (message, postResponse) {
-        const data = message.data;
-        const { type } = data;
-        const { width, height, buffer, ignoreBlackColor } = data;
-        if (type === 'createimage') {
-            const imageBitmap = createImage(width, height, new Uint8Array(buffer), ignoreBlackColor);
-            postResponse(null, { loaded: true, buffer: imageBitmap }, [imageBitmap]);
-        }
-    };
-});
+registerWorkerAdapter(workerKey, WORKERCODE);
 
 function getActor() {
     if (tifActor) {
@@ -376,12 +240,13 @@ export class TifLayer extends TileLayer {
         const row = Math.ceil(height / rowHeight);
         const datas = [];
         let idx = 0;
+        const geoTifInfo = this.geoTifInfo;
         const read = () => {
             if (idx < row) {
                 if (this.options.datadebug) {
                     console.log(`正在读取(by geotiff.readRGB) tif的数据 ${idx + 1}/${row}`);
                 }
-                if (!this.geoTifInfo.bounds) {
+                if (!geoTifInfo.bounds) {
                     return;
                 }
                 const top = idx * rowHeight, bottom = Math.min(top + rowHeight, height);
@@ -396,16 +261,22 @@ export class TifLayer extends TileLayer {
                     read();
                 });
             } else {
-                if (!this.geoTifInfo.bounds) {
+                if (!geoTifInfo.bounds) {
                     return;
                 }
-                this.geoTifInfo.data = mergeArrayBuffer(datas);
+                geoTifInfo.data = mergeArrayBuffer(datas);
 
-                if (!Browser.decodeImageInWorker) {
-                    this.geoTifInfo.canvas = createImage(width, height, this.geoTifInfo.data, this.options.ignoreBlackColor);
-                    this.geoTifInfo.loaded = true;
+                const readEnd = (image) => {
+
+                    geoTifInfo.loaded = true;
+                    geoTifInfo.canvas = image;
                     this.fire('tifload', Object.assign({}, this.geoTifInfo));
                     this._tifLoaded();
+                };
+
+                if (!Browser.decodeImageInWorker) {
+                    const image = createImage(width, height, geoTifInfo.data, this.options.ignoreBlackColor);
+                    readEnd(image);
                 } else {
                     const actor = getActor();
                     const arrayBuffer = this.geoTifInfo.data.buffer;
@@ -415,10 +286,7 @@ export class TifLayer extends TileLayer {
                                 console.error(err);
                                 return;
                             }
-                            this.geoTifInfo.loaded = message.loaded;
-                            this.geoTifInfo.canvas = message.buffer;
-                            this.fire('tifload', Object.assign({}, this.geoTifInfo));
-                            this._tifLoaded();
+                            readEnd(message.buffer);
                         });
                 }
             }

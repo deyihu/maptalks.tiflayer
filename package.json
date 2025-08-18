@@ -3,15 +3,16 @@
   "version": "0.3.0",
   "description": "",
   "main": "dist/maptalks.tiflayer.js",
-  "module": "./index.js",
+  "module": "dist/maptalks.tiflayer.es.js",
   "scripts": {
     "lint": "eslint ./*.js",
-    "build": "npm run lint && cross-env NODE_ENV=dev  rollup -c",
+    "build": "npm run lint && cross-env NODE_ENV=prd  rollup -c",
     "dev": "npm run lint && cross-env NODE_ENV=dev  rollup -c -w",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "files": [
     "src/",
+    "dist/",
     "./index.js"
   ],
   "repository": {
