@@ -242,6 +242,14 @@ export class TifLayer extends TileLayer {
         const datas = [];
         let idx = 0;
         const geoTifInfo = this.geoTifInfo;
+        const readEnd = (image) => {
+
+            geoTifInfo.loaded = true;
+            geoTifInfo.canvas = image;
+            this.fire('tifload', Object.assign({}, this.geoTifInfo));
+            this._tifLoaded();
+        };
+
         const read = () => {
             if (idx < row) {
                 if (this.options.datadebug) {
@@ -259,22 +267,15 @@ export class TifLayer extends TileLayer {
                 }).then(data => {
                     datas.push(data);
                     idx++;
-                    read();
+                    setTimeout(() => {
+                        read();
+                    }, 16);
                 });
             } else {
                 if (!geoTifInfo.bounds) {
                     return;
                 }
                 geoTifInfo.data = mergeArrayBuffer(datas);
-
-                const readEnd = (image) => {
-
-                    geoTifInfo.loaded = true;
-                    geoTifInfo.canvas = image;
-                    this.fire('tifload', Object.assign({}, this.geoTifInfo));
-                    this._tifLoaded();
-                };
-
                 if (!Browser.decodeImageInWorker) {
                     const image = createImage(width, height, geoTifInfo.data, this.options.ignoreBlackColor);
                     readEnd(image);
