@@ -10,7 +10,7 @@ const merc = new SphericalMercator({
 });
 const pool = new Pool();
 const TEMPBBOX1 = [1, 1, 1, 1], TEMPBBOX2 = [1, 1, 1, 1];
-const DEFAULT_TILE_SIZE = 256;
+const DEFAULT_TILE_SIZE = 512;
 const workerKey = '_tifprocess_';
 let tifActor;
 let tempCanvas;
@@ -73,7 +73,8 @@ const options = {
     urlTemplate: './hello?x={x}&y={y}&z={z}',
     datadebug: false,
     quality: 0.6,
-    ignoreBlackColor: false
+    ignoreBlackColor: false,
+    tileSize: DEFAULT_TILE_SIZE
 };
 
 export class TifLayer extends TileLayer {
@@ -301,10 +302,17 @@ export class TifLayer extends TileLayer {
         const [minx, miny, maxx, maxy] = bounds;
         const ax = width / (maxx - minx), ay = height / (maxy - miny);
         const px = (tileminx - minx) * ax, py = height - (tilemaxy - miny) * ay;
-        const w = (tilemaxx - tileminx) * ax, h = (tilemaxy - tileminy) * ay;
-        return [px, py, w, h].map(v => {
-            return Math.round(v);
-        });
+        let w = (tilemaxx - tileminx) * ax, h = (tilemaxy - tileminy) * ay;
+        if (w === 0) {
+            w = 0.1;
+        }
+        if (h === 0) {
+            h = 0.1;
+        }
+        return [px, py, w, h];
+        // return [px, py, w, h].map(v => {
+        //     return v;
+        // });
 
     }
 
