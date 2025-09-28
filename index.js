@@ -237,7 +237,7 @@ export class TifLayer extends TileLayer {
     readTif(image) {
         const width = image.getWidth();
         const height = image.getHeight();
-        const rowHeight = 400;
+        const rowHeight = 100;
         const row = Math.ceil(height / rowHeight);
         const datas = [];
         let idx = 0;
