@@ -1,4 +1,4 @@
 export default `/*!
- * maptalks.tiflayer v0.4.0
+ * maptalks.tiflayer v0.4.1
   */
 (function(e){"use strict";function t(e,t,a,n){let i=3;e*t*4===a.length&&(i=4);const r=function(e,t){let a;return OffscreenCanvas?a=new OffscreenCanvas(e,t):(a=document.createElement("canvas"),a.width=e,a.height=t),a}(e,t),o=r.getContext("2d"),c=o.createImageData(r.width,r.height);let f=0;for(let e=0,t=a.length;e<t;e+=i){const t=a[e],r=a[e+1],o=a[e+2],s=a[e+3];c.data[f]=t,c.data[f+1]=r,c.data[f+2]=o;let l=s;4!==i&&(l=255),n&&0===t&&0===r&&0===o&&(l=0),c.data[f+3]=l,f+=4}return o.putImageData(c,0,0),r.transferToImageBitmap?r.transferToImageBitmap():r}e.initialize=function(){},e.onmessage=function(e,a){const n=e.data,{type:i}=n,{width:r,height:o,buffer:c,ignoreBlackColor:f}=n;if("createimage"===i){const e=t(r,o,new Uint8Array(c),f);a(null,{loaded:!0,buffer:e},[e])}},Object.defineProperty(e,"__esModule",{value:!0})})`
