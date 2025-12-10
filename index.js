@@ -214,6 +214,7 @@ export class TifLayer extends TileLayer {
                 const extent = new Extent(bounds);
                 if (!geoInfo) {
                     console.error('not find tif geo info');
+                    this.fire('geoinfoerror', {});
                     return;
                 }
                 if (is4326(geoInfo.GeographicTypeGeoKey)) {
@@ -222,7 +223,9 @@ export class TifLayer extends TileLayer {
                     bounds = forEachCoordinatesOfExtent(extent, 'inverse');
                     forEachCoordinatesOfExtent(extent, 'inverse', extent);
                 } else {
-                    console.error('Current coordinate projection not supported ', geoInfo);
+                    console.error('Current coordinate projection not supported,only support EPSG:3857/EPSG:4326/EPSG:4490 ', geoInfo);
+                    this.fire('geoinfoerror', { geoInfo });
+                    return;
                 }
                 this.geoTifInfo = Object.assign(this.geoTifInfo, {
                     width, height, bounds, extent, mBounds
