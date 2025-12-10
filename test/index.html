@@ -55,6 +55,10 @@
             map.fitExtent(e.extent);
         })
 
+        layer.on('geoinfoerror', e => {
+           alert('not support prj info or not find prj info')
+        });
+
     </script>
 </body>
 

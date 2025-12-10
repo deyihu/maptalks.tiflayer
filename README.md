@@ -41,6 +41,9 @@ layer.setTifUrl(url);
 layer.on('tifload', e => {
 
 });
+layer.on('geoinfoerror', e => {
+
+});
 ```
 
 ## Custom Tile Data
